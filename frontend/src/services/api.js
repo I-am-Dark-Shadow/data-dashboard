@@ -2,6 +2,7 @@ import axios from 'axios';
 
 //"https://data-dashboard-zs21.vercel.app/api" //'http://localhost:5000/api';
 
+
 const api = axios.create({
   baseURL: "https://data-dashboard-zs21.vercel.app/api",
   timeout: 120000,
@@ -31,10 +32,7 @@ api.interceptors.response.use(
   (error) => {
     console.error('API Error:', error.response?.data || error.message);
     
-    // Handle common errors
-    if (error.response?.status === 401) {
-      // Handle authentication errors if needed
-    } else if (error.response?.status === 500) {
+    if (error.response?.status === 500) {
       console.error('Server Error:', error.response.data);
     }
     
@@ -54,14 +52,14 @@ export const uploadFile = async (file, onProgress = () => {}) => {
       },
       onUploadProgress: (progressEvent) => {
         const percentage = Math.round(
-          (progressEvent.loaded * 100) / progressEvent.total
+          (progressEvent.loaded * 100) / (progressEvent.total || file.size)
         );
         onProgress(percentage);
       },
     });
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.error || 'Upload failed');
+    throw new Error(error.response?.data?.details || error.response?.data?.error || 'Upload failed');
   }
 };
 
@@ -76,11 +74,9 @@ export const getDatasetInfo = async (datasetId) => {
 };
 
 // Get dataset data
-export const getDatasetData = async (datasetId, page = 1, limit = 1000) => {
+export const getDatasetData = async (datasetId) => {
   try {
-    const response = await api.get(`/data/${datasetId}/data`, {
-      params: { page, limit }
-    });
+    const response = await api.get(`/data/${datasetId}/data`);
     return response.data.data;
   } catch (error) {
     throw new Error(error.response?.data?.error || 'Failed to fetch dataset data');
@@ -97,18 +93,6 @@ export const getAllDatasets = async () => {
   }
 };
 
-// Get chart data
-export const getChartData = async (datasetId, chartType, options = {}) => {
-  try {
-    const response = await api.get(`/charts/${datasetId}/${chartType}`, {
-      params: options
-    });
-    return response.data;
-  } catch (error) {
-    throw new Error(error.response?.data?.error || 'Failed to fetch chart data');
-  }
-};
-
 // Delete dataset
 export const deleteDataset = async (datasetId) => {
   try {
@@ -119,26 +103,18 @@ export const deleteDataset = async (datasetId) => {
   }
 };
 
-// Add these functions to src/services/api.js
 
-// AI Analysis functions
-export const generateAIAnalysis = async (datasetId, customPrompt = null) => {
+// --- AI Analysis Functions ---
+
+// This is the function I have fixed
+export const generateAIAnalysis = async (datasetId, context) => {
   try {
     const response = await api.post(`/ai-analysis/${datasetId}/generate`, {
-      customPrompt
+      context // Pass the context object correctly
     });
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.error || 'Failed to generate AI analysis');
-  }
-};
-
-export const getAIAnalysis = async (analysisId) => {
-  try {
-    const response = await api.get(`/ai-analysis/${analysisId}`);
-    return response.data;
-  } catch (error) {
-    throw new Error(error.response?.data?.error || 'Failed to fetch analysis');
+    throw new Error(error.response?.data?.details || error.response?.data?.error || 'Failed to generate AI analysis');
   }
 };
 
@@ -148,6 +124,15 @@ export const getAllAIAnalyses = async (datasetId) => {
     return response.data;
   } catch (error) {
     throw new Error(error.response?.data?.error || 'Failed to fetch analyses');
+  }
+};
+
+export const getAIAnalysis = async (analysisId) => {
+  try {
+    const response = await api.get(`/ai-analysis/${analysisId}`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.error || 'Failed to fetch analysis');
   }
 };
 
