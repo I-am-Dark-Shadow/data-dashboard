@@ -158,7 +158,7 @@ const FileUpload = () => {
                 loop 
                 muted 
                 playsInline
-                src="/demo-video.mp4" 
+                src="" 
             >
                 Your browser does not support the video tag.
             </video>
