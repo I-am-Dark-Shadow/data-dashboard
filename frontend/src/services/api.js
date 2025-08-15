@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-const API_BASE_URL = "https://data-dashboard-zs21.vercel.app/api"; //'http://localhost:5000/api';
+"https://data-dashboard-zs21.vercel.app/api" //'http://localhost:5000/api';
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: "https://data-dashboard-zs21.vercel.app/api",
   timeout: 120000,
   headers: {
     'Content-Type': 'application/json',
