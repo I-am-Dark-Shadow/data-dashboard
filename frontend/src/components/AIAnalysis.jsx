@@ -9,7 +9,7 @@ import {
   generateAIAnalysis, 
   updateAIInsight, 
   deleteAIInsight 
-} from '../services/api';
+} from '../services/api.js';
 
 const AIAnalysis = ({ datasetId, dataset }) => {
   const [analysis, setAnalysis] = useState(null);
