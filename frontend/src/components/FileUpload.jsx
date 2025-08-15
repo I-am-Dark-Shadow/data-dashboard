@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileText, AlertCircle, CheckCircle, X, PlayCircle } from 'lucide-react';
+import { Upload, FileText, AlertCircle, CheckCircle, X, PlayCircle, Play, Pause } from 'lucide-react';
 import { uploadFile } from '../services/api';
 import LoadingSpinner from './LoadingSpinner';
 import { useAuth } from '../App';
@@ -11,8 +11,38 @@ const FileUpload = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [playVideo, setPlayVideo] = useState(false); // Controls if the video should load
+  const [isPlaying, setIsPlaying] = useState(false); // Tracks the video's play/pause state
+  const videoRef = useRef(null); // Ref to access the video element directly
   const navigate = useNavigate();
   const { isAuthenticated, openLoginModal } = useAuth();
+
+  // Function to toggle play/pause on the video element
+  const handlePlayPause = () => {
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play();
+      } else {
+        videoRef.current.pause();
+      }
+    }
+  };
+
+  // Effect to handle spacebar controls for play/pause
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // Only trigger if the video is loaded and the spacebar is pressed
+      if (event.code === 'Space' && playVideo) {
+        event.preventDefault(); // Prevent page from scrolling
+        handlePlayPause();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    // Cleanup function to remove the event listener
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [playVideo]); // Re-run effect if the video is loaded/unloaded
 
   const onDrop = async (acceptedFiles) => {
     if (!isAuthenticated) {
@@ -20,7 +50,6 @@ const FileUpload = () => {
       return;
     }
     
-    // This line was missing, which caused the error.
     const file = acceptedFiles[0];
     if (!file) return;
 
@@ -30,9 +59,7 @@ const FileUpload = () => {
     setUploadProgress(0);
 
     try {
-      // Now we correctly pass the defined 'file' variable
       const result = await uploadFile(file, setUploadProgress);
-      console.log('Upload successful:', result);
       setSuccess(`File "${file.name}" uploaded successfully! Navigating to dashboard...`);
       
       setTimeout(() => {
@@ -73,6 +100,48 @@ const FileUpload = () => {
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
           Turn your raw data into interactive dashboards and professional, AI-driven business reports in seconds.
         </p>
+      </div>
+
+      {/* Demo Video Section */}
+      <div className="mb-12">
+        <div className="bg-white p-2 border border-gray-200 rounded-xl shadow-lg relative">
+          {playVideo ? (
+            <div className="relative group">
+              <video 
+                  ref={videoRef}
+                  className="w-full h-auto rounded-lg cursor-pointer"
+                  onClick={handlePlayPause}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  autoPlay 
+                  loop
+                  playsInline
+                  src="https://res.cloudinary.com/doolgg1ty/video/upload/v1755267424/demo_tc0lgd.mp4" 
+              >
+                  Your browser does not support the video tag.
+              </video>
+              <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <button onClick={handlePlayPause} className="bg-black bg-opacity-30 text-white rounded-full p-2 hover:bg-opacity-75">
+                      {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                  </button>
+              </div>
+            </div>
+          ) : (
+            <div className="relative cursor-pointer group" onClick={() => setPlayVideo(true)}>
+              <img 
+                src="/image.png"
+                alt="Demo video thumbnail" 
+                className="w-full h-auto rounded-lg"
+              />
+              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 rounded-lg group-hover:bg-opacity-30 transition-all duration-300">
+                <div className="text-center text-white transform group-hover:scale-110 transition-transform">
+                    <PlayCircle className="h-16 w-16 mx-auto mb-2 opacity-80" />
+                    <p className="font-semibold">See How It Works</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Upload Area */}
@@ -141,30 +210,6 @@ const FileUpload = () => {
         )}
       </div>
 
-      {/* Demo Video Section */}
-      <div className="my-12">
-        <div className="text-center mb-8">
-            <h3 className="text-3xl font-bold text-gray-900 flex items-center justify-center space-x-3">
-                <PlayCircle className="h-8 w-8 text-primary-600" />
-                <span>See How It Works</span>
-            </h3>
-            <p className="text-lg text-gray-600 mt-2">A quick walkthrough of the dashboard's powerful features.</p>
-        </div>
-        <div className="bg-white p-2 border border-gray-200 rounded-xl shadow-lg">
-             <video 
-                className="w-full h-auto rounded-lg"
-                controls 
-                autoPlay 
-                loop 
-                muted 
-                playsInline
-                src="/video.mp4" 
-            >
-                Your browser does not support the video tag.
-            </video>
-        </div>
-      </div>
-
       {/* Success/Error Messages */}
       {success && (
         <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start justify-between">
@@ -229,7 +274,7 @@ const FileUpload = () => {
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">.xls</span>
         </div>
         <p className="text-xs text-gray-600 mt-2">
-          Maximum file size: 50MB. Files are processed securely and stored temporarily for analysis.
+          Maximum file size: 50MB. Files are processed securely.
         </p>
       </div>
     </div>
