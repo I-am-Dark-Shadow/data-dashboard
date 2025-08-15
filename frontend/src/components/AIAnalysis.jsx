@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, Download, ArrowLeft, BarChart3, TrendingUp, AlertTriangle, Lightbulb, Edit, Trash2, Save, X, Plus } from 'lucide-react';
+import { Brain, Download, ArrowLeft, BarChart3, TrendingUp, AlertTriangle, Lightbulb, Edit, Trash2, Save, X } from 'lucide-react';
 import LoadingSpinner from './LoadingSpinner';
 import ChartContainer from './ChartContainer';
+// Import the functions from your API service
+import { 
+  getAllAIAnalyses, 
+  getAIAnalysis, 
+  generateAIAnalysis, 
+  updateAIInsight, 
+  deleteAIInsight 
+} from '../services/api';
 
 const AIAnalysis = ({ datasetId, dataset }) => {
   const [analysis, setAnalysis] = useState(null);
@@ -9,14 +17,12 @@ const AIAnalysis = ({ datasetId, dataset }) => {
   const [error, setError] = useState(null);
   const [step, setStep] = useState(0);
 
-  // Form state
   const [datasetType, setDatasetType] = useState('');
   const [otherDatasetType, setOtherDatasetType] = useState('');
   const [department, setDepartment] = useState('');
   const [otherDepartment, setOtherDepartment] = useState('');
   const [analysisNeeds, setAnalysisNeeds] = useState([]);
-
-  // Editing State
+  
   const [editingInsight, setEditingInsight] = useState(null);
   const [newInsightText, setNewInsightText] = useState('');
 
@@ -26,24 +32,15 @@ const AIAnalysis = ({ datasetId, dataset }) => {
 
   useEffect(() => {
     loadExistingAnalyses();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datasetId]);
 
   const loadExistingAnalyses = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/ai-analysis/dataset/${datasetId}`);
-      if (!response.ok) {
-        setStep(1);
-        return;
-      }
-      const analyses = await response.json();
-      
+      const analyses = await getAllAIAnalyses(datasetId);
       if (analyses.length > 0) {
-        const latestAnalysis = analyses[0];
-        const analysisResponse = await fetch(`/api/ai-analysis/${latestAnalysis.id}`);
-        const analysisData = await analysisResponse.json();
-        setAnalysis(analysisData);
+        const latestAnalysis = await getAIAnalysis(analyses[0].id);
+        setAnalysis(latestAnalysis);
       } else {
         setStep(1);
       }
@@ -51,7 +48,7 @@ const AIAnalysis = ({ datasetId, dataset }) => {
       console.error('Error loading existing analyses:', err);
       setStep(1);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -61,7 +58,7 @@ const AIAnalysis = ({ datasetId, dataset }) => {
     );
   };
 
-  const generateAnalysis = async () => {
+  const handleGenerateAnalysis = async () => {
     setLoading(true);
     setError(null);
     setStep(0);
@@ -73,18 +70,8 @@ const AIAnalysis = ({ datasetId, dataset }) => {
     };
 
     try {
-      const response = await fetch(`/api/ai-analysis/${datasetId}/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context })
-      });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.details || 'Failed to generate analysis');
-      }
-
-      const result = await response.json();
+      // Use the imported generateAIAnalysis function
+      const result = await generateAIAnalysis(datasetId, context);
       setAnalysis(result.analysis);
     } catch (err) {
       setError(err.message);
@@ -114,28 +101,15 @@ const AIAnalysis = ({ datasetId, dataset }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/ai-analysis/${analysis.id}/insight/${insightId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: newInsightText })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update insight');
-      }
-
-      const result = await response.json();
-      setAnalysis(prev => ({
-        ...prev,
-        content: result.content
-      }));
-      
+      // Use the imported updateAIInsight function
+      const result = await updateAIInsight(analysis.id, insightId, newInsightText);
+      setAnalysis(prev => ({ ...prev, content: result.content }));
       setEditingInsight(null);
       setNewInsightText('');
     } catch (err) {
       setError(err.message);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -145,29 +119,19 @@ const AIAnalysis = ({ datasetId, dataset }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/ai-analysis/${analysis.id}/insight/${insightId}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete insight');
-      }
-
-      const result = await response.json();
-      setAnalysis(prev => ({
-        ...prev,
-        content: result.content
-      }));
+      // Use the imported deleteAIInsight function
+      const result = await deleteAIInsight(analysis.id, insightId);
+      setAnalysis(prev => ({ ...prev, content: result.content }));
     } catch (err) {
       setError(err.message);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
   const exportToPDF = async () => {
     try {
-        const response = await fetch(`/api/ai-analysis/${analysis.id}/export-pdf`);
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/ai-analysis/${analysis.id}/export-pdf`);
         if (!response.ok) {
             throw new Error('PDF generation failed');
         }
@@ -184,6 +148,8 @@ const AIAnalysis = ({ datasetId, dataset }) => {
         setError('Could not download PDF report. ' + err.message);
     }
   };
+
+  // --- Helper functions for rendering (getInsightIcon, getImpactColor) remain the same ---
 
   const getInsightIcon = (type) => {
     switch (type) {
@@ -202,7 +168,7 @@ const AIAnalysis = ({ datasetId, dataset }) => {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
-
+  
   const renderStepContent = () => {
      switch (step) {
       case 1:
@@ -259,7 +225,7 @@ const AIAnalysis = ({ datasetId, dataset }) => {
             </div>
             <div className="mt-6 flex justify-between">
               <button onClick={() => setStep(2)} className="btn-secondary">Back</button>
-              <button onClick={generateAnalysis} disabled={analysisNeeds.length === 0} className="btn-primary disabled:opacity-50 flex items-center space-x-2">
+              <button onClick={handleGenerateAnalysis} disabled={analysisNeeds.length === 0} className="btn-primary disabled:opacity-50 flex items-center space-x-2">
                 <Brain className="h-5 w-5" />
                 <span>Analyze</span>
               </button>
@@ -278,6 +244,7 @@ const AIAnalysis = ({ datasetId, dataset }) => {
     }
   };
 
+  // --- All the rendering logic for loading, error, and the report view remains the same ---
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
