@@ -23,7 +23,7 @@ const app = express();
 // --- CORS Configuration ---
 // This is the key change. We are setting up more detailed CORS options.
 const corsOptions = {
-  origin:  "https://data-dashboard-alpha.vercel.app/", //'http://localhost:3000',
+  origin:  "https://data-dashboard-alpha.vercel.app", //'http://localhost:3000',
   methods: "GET,POST,PUT,DELETE", // Allow these HTTP methods
   credentials: true,
   optionsSuccessStatus: 200 // Some legacy browsers choke on 204
