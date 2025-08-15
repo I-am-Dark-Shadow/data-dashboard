@@ -63,10 +63,10 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Dashboard backend ready!`);
-  console.log(`🤖 AI Analysis powered by Gemini`);
-});
+// app.listen(PORT, () => {
+//   console.log(`🚀 Server running on port ${PORT}`);
+//   console.log(`📊 Dashboard backend ready!`);
+//   console.log(`🤖 AI Analysis powered by Gemini`);
+// });
 
 export default app;
