@@ -37,6 +37,10 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+app.get('/', (req, res) => {
+  res.send('API is running...');
+});
+
 // Routes
 app.use('/api/upload', uploadRoutes);
 app.use('/api/data', dataRoutes);
