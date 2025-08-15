@@ -1,23 +1,23 @@
 // services/fileProcessor.js
 import XLSX from 'xlsx';
-import fs from 'fs';
 import csv from 'csv-parser';
 import path from 'path';
+import { Readable } from 'stream';
 import { saveDataset, saveDatasetColumns, saveDatasetRows } from './dataService.js';
 
 export async function processFile(fileInfo) {
-  const { filename, originalname, path: filePath, size } = fileInfo;
+  // We no longer get a local path, but a buffer
+  const { originalname, buffer, size } = fileInfo;
   
   try {
-    // Determine file type
     const fileExt = path.extname(originalname).toLowerCase();
     let rawData = [];
 
-    // Parse file based on type
+    // Parse file based on type, using the buffer
     if (fileExt === '.csv') {
-      rawData = await parseCSV(filePath);
+      rawData = await parseCSV(buffer);
     } else if (fileExt === '.xlsx' || fileExt === '.xls') {
-      rawData = await parseExcel(filePath);
+      rawData = await parseExcel(buffer);
     } else {
       throw new Error('Unsupported file format');
     }
@@ -26,28 +26,22 @@ export async function processFile(fileInfo) {
       throw new Error('No data found in file');
     }
 
-    // Clean and process data
     const cleanedData = cleanData(rawData);
     const columns = analyzeColumns(cleanedData);
 
-    // Save to database
     const datasetId = await saveDataset({
-      name: originalname.replace(/\.[^/.]+$/, ""), // Remove extension
+      name: originalname.replace(/\.[^/.]+$/, ""),
       originalFilename: originalname,
-      fileType: fileExt.substring(1), // Remove dot
+      fileType: fileExt.substring(1),
       rowCount: cleanedData.length,
       columnCount: columns.length,
       fileSize: size
     });
 
-    // Save column metadata
     await saveDatasetColumns(datasetId, columns);
-
-    // Save data rows
     await saveDatasetRows(datasetId, cleanedData);
 
-    // Clean up temporary file
-    fs.unlinkSync(filePath);
+    // No temporary file to clean up!
 
     return {
       datasetId,
@@ -63,19 +57,19 @@ export async function processFile(fileInfo) {
     };
 
   } catch (error) {
-    // Clean up file on error
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    // No file to clean up on error either
+    console.error("Error processing file:", error);
     throw error;
   }
 }
 
-async function parseCSV(filePath) {
+async function parseCSV(buffer) {
   return new Promise((resolve, reject) => {
     const results = [];
+    // Create a readable stream from the buffer
+    const stream = Readable.from(buffer);
     
-    fs.createReadStream(filePath)
+    stream
       .pipe(csv())
       .on('data', (data) => results.push(data))
       .on('end', () => resolve(results))
@@ -83,9 +77,10 @@ async function parseCSV(filePath) {
   });
 }
 
-async function parseExcel(filePath) {
-  const workbook = XLSX.readFile(filePath);
-  const sheetName = workbook.SheetNames[0]; // Use first sheet
+async function parseExcel(buffer) {
+  // XLSX can read directly from a buffer
+  const workbook = XLSX.read(buffer, { type: 'buffer' });
+  const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
   return XLSX.utils.sheet_to_json(worksheet);
 }
@@ -97,12 +92,10 @@ function cleanData(rawData) {
     Object.keys(row).forEach(key => {
       let value = row[key];
       
-      // Skip null/undefined values
       if (value === null || value === undefined) {
         return;
       }
       
-      // Clean string values
       if (typeof value === 'string') {
         value = value.trim();
         if (value === '' || value.toLowerCase() === 'null') {
@@ -110,42 +103,48 @@ function cleanData(rawData) {
         }
       }
       
-      // Clean column names (remove extra spaces, special chars)
       const cleanKey = key.trim().replace(/[^\w\s]/gi, '').replace(/\s+/g, '_');
       cleanedRow[cleanKey] = value;
     });
     
     return cleanedRow;
-  }).filter(row => Object.keys(row).length > 0); // Remove empty rows
+  }).filter(row => Object.keys(row).length > 0);
 }
 
 function analyzeColumns(data) {
-  if (data.length === 0) return [];
+    if (data.length === 0) return [];
   
-  const sampleRow = data[0];
-  const columns = [];
-  
-  Object.keys(sampleRow).forEach(columnName => {
-    const columnValues = data.map(row => row[columnName]).filter(val => val != null);
-    const uniqueValues = [...new Set(columnValues)];
+    // Use a larger sample for better type analysis, but not the whole dataset if it's huge
+    const sample = data.length > 500 ? data.slice(0, 500) : data;
+    const columnNames = Object.keys(data[0] || {});
+    const columns = [];
     
-    // Determine column type
-    let columnType = 'string';
-    if (columnValues.every(val => !isNaN(val) && !isNaN(parseFloat(val)))) {
-      columnType = 'number';
-    } else if (columnValues.every(val => !isNaN(Date.parse(val)))) {
-      columnType = 'date';
-    } else if (columnValues.every(val => typeof val === 'boolean' || val === 'true' || val === 'false')) {
-      columnType = 'boolean';
-    }
-    
-    columns.push({
-      columnName,
-      columnType,
-      isFilterable: uniqueValues.length < data.length * 0.8, // Filterable if < 80% unique
-      uniqueValuesCount: uniqueValues.length
+    columnNames.forEach(columnName => {
+        const columnValues = sample.map(row => row[columnName]).filter(val => val != null);
+        const uniqueValues = [...new Set(columnValues)];
+        
+        let columnType = 'string';
+        
+        // More robust type checking
+        const isNumeric = columnValues.every(val => val === '' || !isNaN(val) && !isNaN(parseFloat(val)));
+        const isDate = !isNumeric && columnValues.every(val => val === '' || !isNaN(Date.parse(val)));
+        const isBoolean = !isNumeric && !isDate && columnValues.every(val => typeof val === 'boolean' || ['true', 'false', 'yes', 'no', '0', '1'].includes(String(val).toLowerCase()));
+
+        if (isNumeric) {
+            columnType = 'number';
+        } else if (isDate) {
+            columnType = 'date';
+        } else if (isBoolean) {
+            columnType = 'boolean';
+        }
+        
+        columns.push({
+          columnName,
+          columnType,
+          isFilterable: uniqueValues.length < data.length * 0.8,
+          uniqueValuesCount: uniqueValues.length
+        });
     });
-  });
-  
-  return columns;
+    
+    return columns;
 }
