@@ -3,11 +3,10 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import { processFile } from '../services/fileProcessor.js';
-import { storage } from '../config/cloudinary.js'; // Import Cloudinary storage
+import { storage } from '../config/cloudinary.js';
 
 const router = express.Router();
 
-// Configure multer for Cloudinary uploads
 const fileFilter = (req, file, cb) => {
   const allowedTypes = ['.csv', '.xlsx', '.xls'];
   const fileExt = path.extname(file.originalname).toLowerCase();
@@ -20,14 +19,13 @@ const fileFilter = (req, file, cb) => {
 };
 
 const upload = multer({
-  storage: storage, // Use Cloudinary storage
+  storage: storage,
   fileFilter,
   limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB limit
+    fileSize: 50 * 1024 * 1024
   }
 });
 
-// Upload endpoint
 router.post('/', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -36,12 +34,8 @@ router.post('/', upload.single('file'), async (req, res) => {
 
     console.log(`☁️  Processing file from Cloudinary: ${req.file.originalname}`);
 
-    // Process the uploaded file directly from the buffer
-    const result = await processFile({
-      originalname: req.file.originalname,
-      buffer: req.file.buffer, // We will use the buffer instead of path
-      size: req.file.size
-    });
+    // Pass the entire req.file object. It contains the path (URL) and other info.
+    const result = await processFile(req.file);
 
     res.json({
       message: 'File uploaded and processed successfully',

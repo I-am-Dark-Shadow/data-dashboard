@@ -2,22 +2,22 @@
 import XLSX from 'xlsx';
 import csv from 'csv-parser';
 import path from 'path';
-import { Readable } from 'stream';
+import axios from 'axios'; // Import axios
 import { saveDataset, saveDatasetColumns, saveDatasetRows } from './dataService.js';
 
 export async function processFile(fileInfo) {
-  // We no longer get a local path, but a buffer
-  const { originalname, buffer, size } = fileInfo;
+  // `fileInfo.path` is now the URL from Cloudinary
+  const { originalname, path: fileUrl, size } = fileInfo;
   
   try {
     const fileExt = path.extname(originalname).toLowerCase();
     let rawData = [];
 
-    // Parse file based on type, using the buffer
+    // Parse file based on type, using the Cloudinary URL
     if (fileExt === '.csv') {
-      rawData = await parseCSV(buffer);
+      rawData = await parseCSV(fileUrl);
     } else if (fileExt === '.xlsx' || fileExt === '.xls') {
-      rawData = await parseExcel(buffer);
+      rawData = await parseExcel(fileUrl);
     } else {
       throw new Error('Unsupported file format');
     }
@@ -41,8 +41,6 @@ export async function processFile(fileInfo) {
     await saveDatasetColumns(datasetId, columns);
     await saveDatasetRows(datasetId, cleanedData);
 
-    // No temporary file to clean up!
-
     return {
       datasetId,
       summary: {
@@ -57,33 +55,47 @@ export async function processFile(fileInfo) {
     };
 
   } catch (error) {
-    // No file to clean up on error either
     console.error("Error processing file:", error);
     throw error;
   }
 }
 
-async function parseCSV(buffer) {
-  return new Promise((resolve, reject) => {
-    const results = [];
-    // Create a readable stream from the buffer
-    const stream = Readable.from(buffer);
-    
-    stream
-      .pipe(csv())
-      .on('data', (data) => results.push(data))
-      .on('end', () => resolve(results))
-      .on('error', reject);
+async function parseCSV(fileUrl) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const results = [];
+      // Get a readable stream from the URL
+      const response = await axios({
+        method: 'get',
+        url: fileUrl,
+        responseType: 'stream'
+      });
+      
+      response.data
+        .pipe(csv())
+        .on('data', (data) => results.push(data))
+        .on('end', () => resolve(results))
+        .on('error', reject);
+    } catch (error) {
+      reject(error);
+    }
   });
 }
 
-async function parseExcel(buffer) {
-  // XLSX can read directly from a buffer
+async function parseExcel(fileUrl) {
+  // Download the file content into a buffer
+  const response = await axios({
+      method: 'get',
+      url: fileUrl,
+      responseType: 'arraybuffer'
+  });
+  const buffer = response.data;
   const workbook = XLSX.read(buffer, { type: 'buffer' });
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
   return XLSX.utils.sheet_to_json(worksheet);
 }
+
 
 function cleanData(rawData) {
   return rawData.map(row => {
@@ -114,7 +126,6 @@ function cleanData(rawData) {
 function analyzeColumns(data) {
     if (data.length === 0) return [];
   
-    // Use a larger sample for better type analysis, but not the whole dataset if it's huge
     const sample = data.length > 500 ? data.slice(0, 500) : data;
     const columnNames = Object.keys(data[0] || {});
     const columns = [];
@@ -125,7 +136,6 @@ function analyzeColumns(data) {
         
         let columnType = 'string';
         
-        // More robust type checking
         const isNumeric = columnValues.every(val => val === '' || !isNaN(val) && !isNaN(parseFloat(val)));
         const isDate = !isNumeric && columnValues.every(val => val === '' || !isNaN(Date.parse(val)));
         const isBoolean = !isNumeric && !isDate && columnValues.every(val => typeof val === 'boolean' || ['true', 'false', 'yes', 'no', '0', '1'].includes(String(val).toLowerCase()));
