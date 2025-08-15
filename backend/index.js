@@ -19,6 +19,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+app.get('/', (req, res) => {
+  res.send('API is running...');
+});
+
 const PORT = process.env.PORT || 5000;
 
 // Middleware
@@ -37,9 +42,7 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-app.get('/', (req, res) => {
-  res.send('API is running...');
-});
+
 
 // Routes
 app.use('/api/upload', uploadRoutes);
@@ -65,3 +68,5 @@ app.listen(PORT, () => {
   console.log(`📊 Dashboard backend ready!`);
   console.log(`🤖 AI Analysis powered by Gemini`);
 });
+
+export default app;
