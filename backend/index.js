@@ -9,6 +9,7 @@ import uploadRoutes from './routes/upload.js';
 import dataRoutes from './routes/data.js';
 import chartRoutes from './routes/charts.js';
 import aiAnalysisRoutes from './routes/aiAnalysis.js';
+import authRoutes from './routes/auth.js';
 
 // Import middleware
 import errorHandler from './middleware/errorHandler.js';
@@ -23,7 +24,8 @@ const app = express();
 // --- CORS Configuration ---
 // This is the key change. We are setting up more detailed CORS options.
 const corsOptions = {
-  origin:  "https://data-dashboard-alpha.vercel.app", //'http://localhost:3000',
+  origin:  "https://data-dashboard-alpha.vercel.app", 
+  //origin:  'http://localhost:3000',
   methods: "GET,POST,PUT,DELETE", // Allow these HTTP methods
   credentials: true,
   optionsSuccessStatus: 200 // Some legacy browsers choke on 204
@@ -46,6 +48,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/data', dataRoutes);
 app.use('/api/charts', chartRoutes);

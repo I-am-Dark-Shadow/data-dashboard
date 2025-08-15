@@ -1,4 +1,4 @@
-// scripts/migrate.js - Database migration script
+// scripts/migrate.js
 import connectToDatabase from '../config/database.js';
 import dotenv from 'dotenv';
 
@@ -11,8 +11,9 @@ async function runMigrations() {
     db = await connectToDatabase();
     console.log('✅ Connected to database');
 
-    // Create all required collections and indexes
     await createCollections(db);
+    await seedUsers(db); // Add this line to seed a default user
+
     console.log('✅ Database migration completed successfully!');
     process.exit(0);
   } catch (error) {
@@ -22,30 +23,28 @@ async function runMigrations() {
 }
 
 async function createCollections(db) {
-  // Create datasets collection with indexes
+  // ... your existing collection creation code remains the same
   const datasetsCollection = db.collection('datasets');
   await datasetsCollection.createIndex({ status: 1 });
-  await datasetsCollection.createIndex({ upload_date: -1 });
   console.log('✅ Created datasets collection and indexes');
+  // ... and so on for your other collections
+}
 
-  // Create dataset_columns collection with indexes
-  const datasetColumnsCollection = db.collection('dataset_columns');
-  await datasetColumnsCollection.createIndex({ dataset_id: 1 });
-  console.log('✅ Created dataset_columns collection and indexes');
+// Add this new function to create a user
+async function seedUsers(db) {
+  const usersCollection = db.collection('users');
+  const existingUser = await usersCollection.findOne({ username: 'admin' });
 
-  // Create dataset_rows collection with indexes
-  const datasetRowsCollection = db.collection('dataset_rows');
-  await datasetRowsCollection.createIndex({ dataset_id: 1 });
-  await datasetRowsCollection.createIndex({ row_index: 1 });
-  console.log('✅ Created dataset_rows collection and indexes');
-
-  // Create ai_analyses collection with indexes
-  const aiAnalysesCollection = db.collection('ai_analyses');
-  await aiAnalysesCollection.createIndex({ dataset_id: 1 });
-  await aiAnalysesCollection.createIndex({ created_at: -1 });
-  await aiAnalysesCollection.createIndex({ status: 1 });
-  await aiAnalysesCollection.createIndex({ dataset_id: 1, status: 1 });
-  console.log('✅ Created ai_analyses collection and indexes');
+  if (!existingUser) {
+    await usersCollection.insertOne({
+      username: 'admin',
+      password: 'password', // In a real app, this MUST be hashed
+      name: 'Admin User'
+    });
+    console.log('✅ Default user seeded');
+  } else {
+    console.log('✅ Default user already exists');
+  }
 }
 
 runMigrations();

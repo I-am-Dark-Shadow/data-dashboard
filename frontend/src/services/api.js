@@ -5,6 +5,7 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: "https://data-dashboard-zs21.vercel.app/api",
+  //baseURL: 'http://localhost:5000/api',
   timeout: 120000,
   headers: {
     'Content-Type': 'application/json',
@@ -153,6 +154,15 @@ export const deleteAIInsight = async (analysisId, insightId) => {
     return response.data;
   } catch (error) {
     throw new Error(error.response?.data?.error || 'Failed to delete insight');
+  }
+};
+
+export const login = async (username, password) => {
+  try {
+    const response = await api.post('/auth/login', { username, password });
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.error || 'Login failed');
   }
 };
 
